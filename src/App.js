@@ -69,12 +69,12 @@ const TimeCapsule = () => {
 
   useEffect(() => {
     // Fetch files and notes from the backend
-    fetch('http://localhost:5000/files')
+    fetch('/api/files')
       .then((response) => response.json())
       .then((data) => setFiles(data))
       .catch((error) => console.error('Error fetching files:', error));
 
-    fetch('http://localhost:5000/notes')
+    fetch('/api/notes')
       .then((response) => response.json())
       .then((data) => setNotes(data.note || ''))
       .catch((error) => console.error('Error fetching notes:', error));
@@ -86,7 +86,7 @@ const TimeCapsule = () => {
         const fileName = file.name;
 
         // Save file name to the backend
-        fetch('http://localhost:5000/files', {
+        fetch('/api/files', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: fileName }),
@@ -101,7 +101,7 @@ const TimeCapsule = () => {
   };
 
   const handleSaveNotes = () => {
-    fetch('http://localhost:5000/notes', {
+    fetch('/api/notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ note: notes }),
