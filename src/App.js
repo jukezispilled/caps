@@ -61,6 +61,8 @@ const TimeCapsule = () => {
   const [files, setFiles] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [activeTab, setActiveTab] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000);
@@ -68,44 +70,77 @@ const TimeCapsule = () => {
   }, []);
 
   useEffect(() => {
-    // Fetch files and notes from the backend
-    fetch('/api/files')
-      .then((response) => response.json())
-      .then((data) => setFiles(data))
-      .catch((error) => console.error('Error fetching files:', error));
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [filesResponse, notesResponse] = await Promise.all([
+          fetch('/api/files'),
+          fetch('/api/notes')
+        ]);
 
-    fetch('/api/notes')
-      .then((response) => response.json())
-      .then((data) => setNotes(data.note || ''))
-      .catch((error) => console.error('Error fetching notes:', error));
+        if (!filesResponse.ok || !notesResponse.ok) {
+          throw new Error('Failed to fetch data');
+        }
+
+        const filesData = await filesResponse.json();
+        const notesData = await notesResponse.json();
+
+        setFiles(filesData);
+        setNotes(notesData.note || '');
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
-  const handleSaveFiles = () => {
-    if (selectedFiles.length > 0) {
-      Array.from(selectedFiles).forEach((file) => {
-        const fileName = file.name;
+  const handleSaveFiles = async () => {
+    if (selectedFiles.length === 0) return;
 
-        // Save file name to the backend
-        fetch('/api/files', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: fileName }),
-        })
-          .then((response) => response.json())
-          .then((newFile) => setFiles((prev) => [...prev, newFile]))
-          .catch((error) => console.error('Error saving file:', error));
+    setIsLoading(true);
+    try {
+      // Create an array of file names from the selected files
+      const fileNames = Array.from(selectedFiles).map(file => ({
+        name: file.name,
+        timestamp: new Date().toISOString()
+      }));
+
+      const response = await fetch('/api/files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fileNames),
       });
 
+      if (!response.ok) throw new Error('Failed to save files');
+
+      const savedFiles = await response.json();
+      setFiles(prev => [...prev, ...savedFiles]);
       setSelectedFiles([]);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleSaveNotes = () => {
-    fetch('/api/notes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note: notes }),
-    }).catch((error) => console.error('Error saving notes:', error));
+  const handleSaveNotes = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: notes }),
+      });
+
+      if (!response.ok) throw new Error('Failed to save notes');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -118,32 +153,28 @@ const TimeCapsule = () => {
           </WindowHeader>
 
           <Toolbar>
-            <Button variant="menu" size="sm">
-              File
-            </Button>
-            <Button variant="menu" size="sm">
-              Edit
-            </Button>
-            <Button variant="menu" size="sm">
-              Help
-            </Button>
+            <Button variant="menu" size="sm">File</Button>
+            <Button variant="menu" size="sm">Edit</Button>
+            <Button variant="menu" size="sm">Help</Button>
           </Toolbar>
 
           <WindowContent style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <Panel variant="well" style={{ width: '100%', marginBottom: '1rem' }}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(4, 1fr)',
-                  gap: '1rem',
-                  padding: '1rem',
-                  textAlign: 'center',
-                }}
-              >
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '1rem',
+                padding: '1rem',
+                textAlign: 'center',
+              }}>
                 {Object.entries(timeLeft).map(([unit, value]) => (
                   <div key={unit}>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{String(value).padStart(2, '0')}</div>
-                    <div style={{ fontSize: '12px', textTransform: 'uppercase' }}>{unit}</div>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
+                      {String(value).padStart(2, '0')}
+                    </div>
+                    <div style={{ fontSize: '12px', textTransform: 'uppercase' }}>
+                      {unit}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -165,7 +196,7 @@ const TimeCapsule = () => {
                   />
                   <Button
                     onClick={handleSaveFiles}
-                    disabled={selectedFiles.length === 0}
+                    disabled={selectedFiles.length === 0 || isLoading}
                     style={{ marginBottom: '1rem', width: '100%' }}
                   >
                     Save Selected Files
@@ -181,16 +212,14 @@ const TimeCapsule = () => {
                     }}
                   >
                     {files.length === 0 ? (
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          height: '100%',
-                          color: '#666',
-                        }}
-                      >
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '100%',
+                        color: '#666',
+                      }}>
                         <Hourglass size={32} />
                         <p style={{ marginTop: '0.5rem' }}>No files saved yet...</p>
                       </div>
@@ -207,7 +236,9 @@ const TimeCapsule = () => {
                             }}
                           >
                             <span>{file.name}</span>
-                            <span style={{ fontSize: '12px', color: '#666' }}>{file.timestamp}</span>
+                            <span style={{ fontSize: '12px', color: '#666' }}>
+                              {new Date(file.timestamp).toLocaleString()}
+                            </span>
                           </ListItem>
                         ))}
                       </List>
@@ -225,8 +256,13 @@ const TimeCapsule = () => {
                     rows={10}
                     placeholder="Write your notes here..."
                     style={{ marginBottom: '1rem', width: '100%' }}
+                    disabled={isLoading}
                   />
-                  <Button onClick={handleSaveNotes} style={{ width: '100%' }}>
+                  <Button 
+                    onClick={handleSaveNotes} 
+                    style={{ width: '100%' }}
+                    disabled={isLoading}
+                  >
                     Save Notes
                   </Button>
                 </div>
