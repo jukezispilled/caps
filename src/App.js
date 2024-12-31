@@ -99,32 +99,33 @@ const TimeCapsule = () => {
 
   const handleSaveFiles = async () => {
     if (selectedFiles.length === 0) return;
-
+  
     setIsLoading(true);
     try {
       // Create an array of file names from the selected files
       const fileNames = Array.from(selectedFiles).map(file => ({
-        name: file.name,
+        name: file.name, // Only saving the file name
         timestamp: new Date().toISOString()
       }));
-
+  
       const response = await fetch('/api/files', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fileNames),
+        body: JSON.stringify({ files: fileNames }), // Send an object with a "files" property
       });
-
+  
       if (!response.ok) throw new Error('Failed to save files');
-
+  
+      // Assuming the response contains the saved file names
       const savedFiles = await response.json();
-      setFiles(prev => [...prev, ...savedFiles]);
-      setSelectedFiles([]);
+      setFiles(prev => [...prev, ...savedFiles]); // Update state with saved files
+      setSelectedFiles([]); // Clear selected files after saving
     } catch (err) {
       setError(err.message);
     } finally {
       setIsLoading(false);
     }
-  };
+  };  
 
   const handleSaveNotes = async () => {
     setIsLoading(true);
