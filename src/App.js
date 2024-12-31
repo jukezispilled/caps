@@ -147,6 +147,12 @@ const TimeCapsule = () => {
   return (
     <ThemeProvider theme={original}>
       <GlobalStyles />
+      <div className='absolute top-4 left-1/2 transform -translate-x-1/2 hidden md:block'>
+        <Window>
+          CA: uploading
+        </Window>
+      </div>
+
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
         <Window style={{ width: '600px' }}>
           <WindowHeader style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
